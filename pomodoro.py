@@ -22,7 +22,7 @@ class PomodoroInterface:
     time_elapsed_label: ttk.Label
     time_left_label: ttk.Label
     iterations_left_label: ttk.Label
-    status: ttk.Label
+    status_label: ttk.Label
 
     def __init__ (self, root: tk.Tk):
         self.root = root
@@ -34,18 +34,63 @@ class PomodoroInterface:
         self.stop_button.config(command=self.stop_timer)
         self.pause_button.config(command=self.pause_timer)
         self.timer_running = False
+        self.timer_job = None
 
     def start_timer(self):
         if not self.timer_running:
             self.timer_running = True
+            self.current_phase = "work"
+            self.iterations_left = int(self.iterations_entry.get())
+            self.run_timer()
 
-    def stop_timer(self):
-        self.timer_running = False
-        self.progress_bar["value"] = 0
+    def run_timer(self):
+        if not self.timer_running:
+            return
+
+        if not hasattr(self, "time_remaining"):
+            duration = int(self.work_time_entry.get()) * 60
+            self.time_remaining = duration
+
+        mins, secs = divmod(self.time_remaining, 60)
+        time_str = f"{mins:02d}:{secs:02d}"
+        self.time_left_label.config(text=f"Time Left: {time_str}")
+        self.time_elapsed_label.config(text=f"Time Elapsed: {self._format_elapsed()}")
+
+        progress = ((int(self.work_time_entry.get()) * 60 - self.time_remaining) / (int(self.work_time_entry.get()) * 60)) * 100
+        self.progress_bar["value"] = progress
+
+        if self.time_remaining > 0:
+            self.time_remaining -= 1
+            self.root.after(1000, self.run_timer)
+        else:
+            self.timer_running = False
+            self.timer_job = None
+
+            self.progress_bar["value"] = 100
+            self.status_label.config(text="Status: Session Complete")
+
+    def _format_elapsed(self):
+        total = (int(self.work_time_entry.get()) * 60) - self.time_remaining
+        mins, secs = divmod(total, 60)
+        return f"{mins:02d}:{secs:02d}"
 
     def pause_timer(self):
+        if self.timer_job:
+            self.root.after_cancel(self.timer_job)
+            self.timer_job = None
         self.timer_running = False
-                    
+
+    def stop_timer(self):
+        if self.timer_job:
+            self.root.after_cancel(self.timer_job)
+            self.timer_job = None
+        self.timer_running = False
+        self.time_remaining = None
+        self.progress_bar["value"] = 0
+        self.time_left_label.config(text="Time Left: 00:00")
+        self.time_elapsed_label.config(text="Time Elapsed: 00:00")
+        self.status_label.config(text="Status: Stopped")
+
 class LayoutManager:
     def __init__(self, interface: PomodoroInterface):
         self.interface = interface
@@ -54,8 +99,8 @@ class LayoutManager:
     def init_layout(self):
         self._time_entry_frame()
         self._buttons_frame()
+        self._status_frame()        
         self._progress_bar_frame()
-        self._status_frame()
 
     def _time_entry_frame(self):
         frame = ttk.Frame(self.root)
@@ -107,6 +152,22 @@ class LayoutManager:
         self.interface.pause_button.pack(side="left", padx=1)
         self.interface.stop_button.pack(side="left", padx=1)
 
+    def _status_frame(self):
+        frame = ttk.Frame(self.root)
+        frame.pack(pady=1)
+
+        self.interface.status_label = ttk.Label(frame, text="Status: Ready")
+        self.interface.status_label.pack(pady=1)
+
+        self.interface.time_elapsed_label = ttk.Label(frame, text="Time Elapsed: 00:00")
+        self.interface.time_elapsed_label.pack(pady=1)
+
+        self.interface.time_left_label = ttk.Label(frame, text="Time Left: 00:00")
+        self.interface.time_left_label.pack(pady=1)
+
+        self.interface.iterations_left_label = ttk.Label(frame, text="Iterations Left: -")
+        self.interface.iterations_left_label.pack(pady=1)        
+
     def _progress_bar_frame(self):
         frame = ttk.Frame(self.root)
         frame.pack(pady=1)
@@ -114,10 +175,6 @@ class LayoutManager:
         self.interface.progress_bar = ttk.Progressbar(frame,
         orient="horizontal", length=225, mode="determinate")
         self.interface.progress_bar.pack(pady=1)
-
-    def _status_frame(self):
-        frame = ttk.Frame(self.root)
-        frame.pack(pady=1)
 
 def run():
     root = tk.Tk()
@@ -128,7 +185,7 @@ def run():
 
     screen_width = root.winfo_screenwidth()
     screen_height = root.winfo_screenheight()
-    root.geometry(f"500x500+{(screen_width - 500) // 2}+{(screen_height - 500) // 2}")
+    root.geometry(f"275x225+{(screen_width - 275) // 2}+{(screen_height - 225) // 2}")
 
     app = PomodoroInterface(root)
 
