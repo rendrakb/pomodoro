@@ -113,11 +113,10 @@ class PomodoroInterface:
 
         self.current_iteration = 0
         self.total_iterations = 0
-        
+
         self.current_phase = "work"
         self.phase_label.config(text="Phase: -")
         self.iterations_left_label.config(text="Iterations Left: -")
-
 
     def _finish_session(self):
         self.timer_job = None
@@ -132,7 +131,7 @@ class PomodoroInterface:
 
         elif self.current_phase in ("break", "longbreak"):
             if self.current_iteration >= self.total_iterations:
-                self.status_label.config(text="Pomodoro Complete!")
+                self.status_label.config(text="Pomodoro is Finished")
                 self.state = "idle"
                 return
             else:
@@ -175,14 +174,14 @@ class LayoutManager:
         row1 = ttk.Frame(frame)
         row1.pack(pady=3)
 
-        work_label = ttk.Label(row1, text="Work:")
+        work_label = ttk.Label(row1, text="Work (mins):")
         work_label.pack(side="left", padx=3)
 
         self.interface.work_time_entry = ttk.Entry(row1, width=3)
         self.interface.work_time_entry.insert(0, "25")
         self.interface.work_time_entry.pack(side="left", padx=3)
 
-        break_label = ttk.Label(row1, text="Break:")
+        break_label = ttk.Label(row1, text="Break (mins):")
         break_label.pack(side="left", padx=3)
 
         self.interface.break_time_entry = ttk.Entry(row1, width=3)
@@ -192,7 +191,7 @@ class LayoutManager:
         row2 = ttk.Frame(frame)
         row2.pack(pady=3)
 
-        longbreak_label = ttk.Label(row2, text="Longbreak:")
+        longbreak_label = ttk.Label(row2, text="Longbreak (mins):")
         longbreak_label.pack(side="left", padx=3)
 
         self.interface.longbreak_time_entry = ttk.Entry(row2, width=3)
@@ -250,7 +249,6 @@ def run():
 
     root.title("Pomodoro")
     root.resizable(False, False)
-    root.attributes("-topmost", True)
 
     screen_width = root.winfo_screenwidth()
     screen_height = root.winfo_screenheight()
