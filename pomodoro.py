@@ -23,6 +23,7 @@ class PomodoroInterface:
     time_left_label: ttk.Label
     iterations_left_label: ttk.Label
     status_label: ttk.Label
+    phase_label: ttk.Label
 
     def __init__ (self, root: tk.Tk):
         self.root = root
@@ -34,62 +35,76 @@ class PomodoroInterface:
         self.stop_button.config(command=self.stop_timer)
         self.pause_button.config(command=self.pause_timer)
         self.timer_running = False
+
+        self.state = "idle"
+        self.time_remaining = 0
         self.timer_job = None
 
-    def start_timer(self):
-        if not self.timer_running:
-            self.timer_running = True
-            self.current_phase = "work"
-            self.iterations_left = int(self.iterations_entry.get())
-            self.run_timer()
 
-    def run_timer(self):
-        if not self.timer_running:
+    def start_timer(self):
+        if self.state == "running":
             return
 
-        if not hasattr(self, "time_remaining"):
-            duration = int(self.work_time_entry.get()) * 60
+        if self.state == "idle":
+            try:
+                duration = int(self.work_time_entry.get()) * 60
+            except ValueError:
+                self.status_label.config(text="Invalid time input.")
+                return
+
             self.time_remaining = duration
+            self.progress_bar["value"] = 0
+            self.status_label.config(text="Status: Running")
+        
+        self.state = "running"
+        self._run_timer()
+
+    def _run_timer(self):
+        if self.state != "running":
+            return
 
         mins, secs = divmod(self.time_remaining, 60)
-        time_str = f"{mins:02d}:{secs:02d}"
-        self.time_left_label.config(text=f"Time Left: {time_str}")
-        self.time_elapsed_label.config(text=f"Time Elapsed: {self._format_elapsed()}")
-
-        progress = ((int(self.work_time_entry.get()) * 60 - self.time_remaining) / (int(self.work_time_entry.get()) * 60)) * 100
-        self.progress_bar["value"] = progress
+        self.time_left_label.config(text=f"Time Left: {mins:02}:{secs:02}")
+        
+        total_time = int(self.work_time_entry.get()) * 60
+        elapsed = total_time - self.time_remaining
+        self.time_elapsed_label.config(text=f"Time Elapsed: {elapsed // 60:02}:{elapsed % 60:02}")
+        self.progress_bar["value"] = (elapsed / total_time) * 100
 
         if self.time_remaining > 0:
             self.time_remaining -= 1
-            self.root.after(1000, self.run_timer)
+            self.timer_job = self.root.after(1000, self._run_timer)
         else:
-            self.timer_running = False
-            self.timer_job = None
-
-            self.progress_bar["value"] = 100
-            self.status_label.config(text="Status: Session Complete")
-
-    def _format_elapsed(self):
-        total = (int(self.work_time_entry.get()) * 60) - self.time_remaining
-        mins, secs = divmod(total, 60)
-        return f"{mins:02d}:{secs:02d}"
+            self._finish_session()
 
     def pause_timer(self):
+        if self.state != "running":
+            return
+
         if self.timer_job:
             self.root.after_cancel(self.timer_job)
             self.timer_job = None
-        self.timer_running = False
+
+        self.state = "paused"
+        self.status_label.config(text="Status: Paused")
 
     def stop_timer(self):
         if self.timer_job:
             self.root.after_cancel(self.timer_job)
             self.timer_job = None
-        self.timer_running = False
-        self.time_remaining = None
+
+        self.state = "idle"
+        self.time_remaining = 0
         self.progress_bar["value"] = 0
+        self.status_label.config(text="Status: Stopped")
         self.time_left_label.config(text="Time Left: 00:00")
         self.time_elapsed_label.config(text="Time Elapsed: 00:00")
-        self.status_label.config(text="Status: Stopped")
+
+    def _finish_session(self):
+        self.state = "idle"
+        self.timer_job = None
+        self.progress_bar["value"] = 100
+        self.status_label.config(text="Status: Session Complete")
 
 class LayoutManager:
     def __init__(self, interface: PomodoroInterface):
@@ -159,6 +174,9 @@ class LayoutManager:
         self.interface.status_label = ttk.Label(frame, text="Status: Ready")
         self.interface.status_label.pack(pady=1)
 
+        self.interface.phase_label = ttk.Label(frame, text="Phase: Work")
+        self.interface.phase_label.pack(pady=1)
+
         self.interface.time_elapsed_label = ttk.Label(frame, text="Time Elapsed: 00:00")
         self.interface.time_elapsed_label.pack(pady=1)
 
@@ -166,7 +184,7 @@ class LayoutManager:
         self.interface.time_left_label.pack(pady=1)
 
         self.interface.iterations_left_label = ttk.Label(frame, text="Iterations Left: -")
-        self.interface.iterations_left_label.pack(pady=1)        
+        self.interface.iterations_left_label.pack(pady=1)
 
     def _progress_bar_frame(self):
         frame = ttk.Frame(self.root)
@@ -185,7 +203,7 @@ def run():
 
     screen_width = root.winfo_screenwidth()
     screen_height = root.winfo_screenheight()
-    root.geometry(f"275x225+{(screen_width - 275) // 2}+{(screen_height - 225) // 2}")
+    root.geometry(f"275x250+{(screen_width - 275) // 2}+{(screen_height - 250) // 2}")
 
     app = PomodoroInterface(root)
 
