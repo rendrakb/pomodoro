@@ -3,6 +3,9 @@ import sys
 try:
     import tkinter as tk
     from tkinter import ttk
+    import plyer
+    from plyer import notification
+    import pygame
 
 except (ModuleNotFoundError, ImportError):
     print(
@@ -27,6 +30,8 @@ class PomodoroInterface:
 
     def __init__ (self, root: tk.Tk):
         self.root = root
+
+        pygame.mixer.init()
 
         self.layout = LayoutManager(self)
         self.layout.init_layout()
@@ -119,6 +124,7 @@ class PomodoroInterface:
         self.iterations_left_label.config(text="Iterations Left: -")
 
     def _finish_session(self):
+        self.play_notification()
         self.timer_job = None
 
         if self.current_phase == "work":
@@ -155,6 +161,22 @@ class PomodoroInterface:
         self.time_elapsed_label.config(text="Time Elapsed: 00:00")
         self.time_left_label.config(text="Time Left: 00:00")
         self.iterations_left_label.config(text=f"Iterations Left: {self.total_iterations - self.current_iteration}")
+
+    def play_notification(self):
+        try:
+            pygame.mixer.music.load("ding.wav")
+            pygame.mixer.music.play()
+        except Exception as e:
+            print("Sound error:", e)
+
+        try:
+            notification.notify(
+                title="Pomodoro",
+                message=f"{self.current_phase.capitalize()} phase is finished",
+                timeout=5
+            )
+        except Exception as e:
+            print("Notification error:", e)
 
 class LayoutManager:
     def __init__(self, interface: PomodoroInterface):
