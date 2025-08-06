@@ -40,6 +40,9 @@ class PomodoroInterface:
         self.time_remaining = 0
         self.timer_job = None
 
+        self.current_iteration = 0
+        self.total_iterations = 0
+        self.current_phase = "work"
 
     def start_timer(self):
         if self.state == "running":
@@ -47,15 +50,16 @@ class PomodoroInterface:
 
         if self.state == "idle":
             try:
-                duration = int(self.work_time_entry.get()) * 60
+                self.total_iterations = int(self.iterations_entry.get())
+                self.current_iteration = 0
             except ValueError:
-                self.status_label.config(text="Invalid time input.")
+                self.status_label.config(text="Invalid iterations input.")
                 return
 
-            self.time_remaining = duration
-            self.progress_bar["value"] = 0
+            self.current_phase = "work"
+            self._set_phase_timer()
             self.status_label.config(text="Status: Running")
-        
+
         self.state = "running"
         self._run_timer()
 
@@ -65,8 +69,14 @@ class PomodoroInterface:
 
         mins, secs = divmod(self.time_remaining, 60)
         self.time_left_label.config(text=f"Time Left: {mins:02}:{secs:02}")
-        
-        total_time = int(self.work_time_entry.get()) * 60
+
+        if self.current_phase == "work":
+            total_time = int(self.work_time_entry.get()) * 60
+        elif self.current_phase == "break":
+            total_time = int(self.break_time_entry.get()) * 60
+        elif self.current_phase == "longbreak":
+            total_time = int(self.longbreak_time_entry.get()) * 60
+
         elapsed = total_time - self.time_remaining
         self.time_elapsed_label.config(text=f"Time Elapsed: {elapsed // 60:02}:{elapsed % 60:02}")
         self.progress_bar["value"] = (elapsed / total_time) * 100
@@ -96,15 +106,56 @@ class PomodoroInterface:
         self.state = "idle"
         self.time_remaining = 0
         self.progress_bar["value"] = 0
+
         self.status_label.config(text="Status: Stopped")
         self.time_left_label.config(text="Time Left: 00:00")
         self.time_elapsed_label.config(text="Time Elapsed: 00:00")
 
+        self.current_iteration = 0
+        self.total_iterations = 0
+        
+        self.current_phase = "work"
+        self.phase_label.config(text="Phase: -")
+        self.iterations_left_label.config(text="Iterations Left: -")
+
+
     def _finish_session(self):
-        self.state = "idle"
         self.timer_job = None
-        self.progress_bar["value"] = 100
-        self.status_label.config(text="Status: Session Complete")
+
+        if self.current_phase == "work":
+            self.current_iteration += 1
+
+            if self.current_iteration >= self.total_iterations:
+                self.current_phase = "longbreak"
+            else:
+                self.current_phase = "break"
+
+        elif self.current_phase in ("break", "longbreak"):
+            if self.current_iteration >= self.total_iterations:
+                self.status_label.config(text="Pomodoro Complete!")
+                self.state = "idle"
+                return
+            else:
+                self.current_phase = "work"
+
+        self._set_phase_timer()
+        self._run_timer()
+
+    def _set_phase_timer(self):
+        if self.current_phase == "work":
+            self.time_remaining = int(self.work_time_entry.get()) * 60
+            self.phase_label.config(text="Phase: Work")
+        elif self.current_phase == "break":
+            self.time_remaining = int(self.break_time_entry.get()) * 60
+            self.phase_label.config(text="Phase: Short Break")
+        elif self.current_phase == "longbreak":
+            self.time_remaining = int(self.longbreak_time_entry.get()) * 60
+            self.phase_label.config(text="Phase: Long Break")
+
+        self.progress_bar["value"] = 0
+        self.time_elapsed_label.config(text="Time Elapsed: 00:00")
+        self.time_left_label.config(text="Time Left: 00:00")
+        self.iterations_left_label.config(text=f"Iterations Left: {self.total_iterations - self.current_iteration}")
 
 class LayoutManager:
     def __init__(self, interface: PomodoroInterface):
